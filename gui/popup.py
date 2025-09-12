@@ -25,6 +25,21 @@ class PopupWindow(QWidget):
             return
             
         key = event.key()
+        modifiers = event.modifiers()
+        
+        # Handle scrolling shortcuts
+        if key == Qt.Key.Key_J:  # j key
+            if modifiers & Qt.KeyboardModifier.ControlModifier:  # Ctrl+j
+                self._scroll_page_down()
+            else:  # j
+                self._scroll_down()
+            return
+        elif key == Qt.Key.Key_K:  # k key
+            if modifiers & Qt.KeyboardModifier.ControlModifier:  # Ctrl+k
+                self._scroll_page_up()
+            else:  # k
+                self._scroll_up()
+            return
         
         # Handle spacebar for navigation
         if key == Qt.Key.Key_Space or key == 32:  # 32 is ASCII for space
@@ -64,6 +79,26 @@ class PopupWindow(QWidget):
         
         # Pass other key events to parent
         super().keyPressEvent(event)
+    
+    def _scroll_up(self):
+        """Scroll up by one line"""
+        if hasattr(self.parent_popup, 'card_view'):
+            self.parent_popup.card_view.page().runJavaScript("window.scrollBy(0, -50);")
+    
+    def _scroll_down(self):
+        """Scroll down by one line"""
+        if hasattr(self.parent_popup, 'card_view'):
+            self.parent_popup.card_view.page().runJavaScript("window.scrollBy(0, 50);")
+    
+    def _scroll_page_up(self):
+        """Scroll up by one page"""
+        if hasattr(self.parent_popup, 'card_view'):
+            self.parent_popup.card_view.page().runJavaScript("window.scrollBy(0, -window.innerHeight * 0.8);")
+    
+    def _scroll_page_down(self):
+        """Scroll down by one page"""
+        if hasattr(self.parent_popup, 'card_view'):
+            self.parent_popup.card_view.page().runJavaScript("window.scrollBy(0, window.innerHeight * 0.8);")
 
 
 class RuzuPopup(QDialog):
@@ -190,28 +225,32 @@ class RuzuPopup(QDialog):
                     </html>
                 """)
 
-    def update_card(self, card):
+    def update_card(self, card_html):
         # TODO - Look into using existing AnkiWebView object to render duplicate card with full compatibility
-        self.card_view.setHtml("""
-                    <!doctype html>
-                    <html class=" webkit chrome win js">
-                        <head>
-                            <title>main webview</title>
-                            %(base)s
-                            <style>
-                                body { zoom: 1; background: #f0f0f0; direction: ltr; font-size:12px;font-family:"Segoe UI"; }
-                                button { font-family:"Segoe UI"; }
-                                :focus { outline: 1px solid #0078d7; }
-                            </style>
-                        </head>
-
-                        <body class="card card2 isWin">
-                            <div id="qa" style="opacity: 1;">
-                                """ + card + """
-                            </div>
-                        </body>
-                    </html>
-                """ % dict(base=self.anki_utils.main_window().baseHTML()))
+        base_html = self.anki_utils.main_window().baseHTML()
+        
+        # Inject card content and base HTML into the template
+        full_html = """
+            <!doctype html>
+            <html class="webkit chrome win js">
+                <head>
+                    <title>main webview</title>
+                    {base}
+                    <style>
+                        body {{ zoom: 1; background: #f0f0f0; direction: ltr; font-size:12px;font-family:"Segoe UI"; }}
+                        button {{ font-family:"Segoe UI"; }}
+                        :focus {{ outline: 1px solid #0078d7; }}
+                    </style>
+                </head>
+                <body class="card card2 isWin">
+                    <div id="qa" style="opacity: 1;">
+                        {card}
+                    </div>
+                </body>
+            </html>
+        """.format(base=base_html, card=card_html)
+        
+        self.card_view.setHtml(full_html)
 
     def pre_popup_validate(self):
         self.logger.info('pre_popup_validate...')
